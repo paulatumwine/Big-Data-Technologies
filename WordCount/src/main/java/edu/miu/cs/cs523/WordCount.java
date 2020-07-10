@@ -2,6 +2,7 @@ package edu.miu.cs.cs523;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
@@ -79,8 +80,14 @@ public class WordCount extends Configured implements Tool
 		job.setInputFormatClass(TextInputFormat.class);
 		job.setOutputFormatClass(TextOutputFormat.class);
 
-		FileInputFormat.addInputPath(job, new Path(args[0]));
-		FileOutputFormat.setOutputPath(job, new Path(args[1]));
+		FileSystem hdfs = FileSystem.get(getConf());
+
+		Path inputDir = new Path(args[0]);
+		FileInputFormat.addInputPath(job, inputDir);
+
+		Path outputDir = new Path(args[1]);
+		if (hdfs.exists(outputDir)) hdfs.delete(outputDir, true);
+		FileOutputFormat.setOutputPath(job, outputDir);
 
 		return job.waitForCompletion(true) ? 0 : 1;
 	}

@@ -2,19 +2,11 @@
 
 cd $HADOOP_PREFIX
 
-bin/hadoop fs -rm -r -f lordofthejars
-rm -rf lordofthejars
-
 bin/hadoop fs -mkdir lordofthejars
 bin/hadoop fs -ls lordofthejars 
 
-bin/hadoop fs -put $HADOOP_PREFIX/Lab2-WC-Input.txt lordofthejars
+bin/hadoop fs -put $HADOOP_PREFIX/input/Lab2-WC-Input.txt lordofthejars
 bin/hadoop fs -ls lordofthejars
-
-bin/hadoop fs -rm -r -f $HADOOP_PREFIX/output
-rm -rf $HADOOP_PREFIX/output
-bin/hadoop fs -rm -r -f output
-rm -rf output
 
 bin/hadoop jar WordCount.jar edu.miu.cs.cs523.WordCount lordofthejars output
 bin/hadoop fs -ls output 
