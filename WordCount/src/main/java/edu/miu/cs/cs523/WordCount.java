@@ -1,4 +1,4 @@
-import java.io.IOException;
+package edu.miu.cs.cs523;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -15,6 +15,8 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+
+import java.io.IOException;
 
 public class WordCount extends Configured implements Tool
 {
@@ -65,7 +67,7 @@ public class WordCount extends Configured implements Tool
 	public int run(String[] args) throws Exception
 	{
 
-		Job job = new Job(getConf(), "WordCount");
+		Job job = new Job(getConf(), "edu.miu.cs.cs523.WordCount");
 		job.setJarByClass(WordCount.class);
 
 		job.setMapperClass(WordCountMapper.class);
