@@ -18,6 +18,8 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
 
 public class WordCount extends Configured implements Tool
 {
@@ -42,10 +44,18 @@ public class WordCount extends Configured implements Tool
 	public static class WordCountReducer extends Reducer<Text, IntWritable, Text, IntWritable>
 	{
 		private IntWritable result = new IntWritable();
+		private Set<String> uniqueWords;
+
+		@Override
+		protected void setup(Context context) throws IOException, InterruptedException {
+			super.setup(context);
+			uniqueWords = new HashSet<String>();
+		}
 
 		@Override
 		public void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException
 		{
+			uniqueWords.add(key.toString());
 			int sum = 0;
 			for (IntWritable val : values)
 			{
@@ -53,6 +63,13 @@ public class WordCount extends Configured implements Tool
 			}
 			result.set(sum);
 			context.write(key, result);
+		}
+
+		@Override
+		protected void cleanup(Context context) throws IOException, InterruptedException {
+			super.cleanup(context);
+			result.set(uniqueWords.size());
+			context.write(new Text("unique-words"), result);
 		}
 	}
 
@@ -67,7 +84,6 @@ public class WordCount extends Configured implements Tool
 
 	public int run(String[] args) throws Exception
 	{
-
 		Job job = new Job(getConf(), "edu.miu.cs.cs523.WordCount");
 		job.setJarByClass(WordCount.class);
 
@@ -79,6 +95,8 @@ public class WordCount extends Configured implements Tool
 
 		job.setInputFormatClass(TextInputFormat.class);
 		job.setOutputFormatClass(TextOutputFormat.class);
+
+		job.setNumReduceTasks(2);
 
 		FileSystem hdfs = FileSystem.get(getConf());
 
