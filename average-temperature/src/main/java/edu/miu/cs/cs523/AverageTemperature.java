@@ -7,6 +7,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
@@ -37,12 +38,15 @@ public class AverageTemperature extends Configured implements Tool {
 
         job.setMapperClass(AverageTemperatureMapper.class);
         job.setReducerClass(AverageTemperatureReducer.class);
+        job.setPartitionerClass(CustomPartitioner.class);
 
         job.setOutputKeyClass(YearWritable.class);
         job.setOutputValueClass(PairWritable.class);
 
         job.setInputFormatClass(TextInputFormat.class);
         job.setOutputFormatClass(TextOutputFormat.class);
+
+        job.setNumReduceTasks(2);
 
         FileSystem hdfs = FileSystem.get(getConf());
 
@@ -81,6 +85,14 @@ public class AverageTemperature extends Configured implements Tool {
             for (Integer e: cache.keySet()) {
                 context.write(new YearWritable(e), cache.get(e));
             }
+        }
+    }
+
+    public static class CustomPartitioner<K, V> extends Partitioner<K, V> {
+        @Override
+        public int getPartition(K k, V v, int i) {
+            YearWritable yw = (YearWritable) k;
+            return yw.getYear() < 1930 ? 0 : 1;
         }
     }
 
