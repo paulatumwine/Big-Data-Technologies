@@ -38,7 +38,7 @@ public class AverageTemperature extends Configured implements Tool {
         job.setMapperClass(AverageTemperatureMapper.class);
         job.setReducerClass(AverageTemperatureReducer.class);
 
-        job.setOutputKeyClass(IntWritable.class);
+        job.setOutputKeyClass(YearWritable.class);
         job.setOutputValueClass(PairWritable.class);
 
         job.setInputFormatClass(TextInputFormat.class);
@@ -56,7 +56,7 @@ public class AverageTemperature extends Configured implements Tool {
         return job.waitForCompletion(true) ? 0 : 1;
     }
 
-    public static class AverageTemperatureMapper extends Mapper<LongWritable, Text, IntWritable, PairWritable> {
+    public static class AverageTemperatureMapper extends Mapper<LongWritable, Text, YearWritable, PairWritable> {
         Map<Integer, PairWritable> cache;
 
         @Override
@@ -79,14 +79,14 @@ public class AverageTemperature extends Configured implements Tool {
         @Override
         protected void cleanup(Context context) throws IOException, InterruptedException {
             for (Integer e: cache.keySet()) {
-                context.write(new IntWritable(e), cache.get(e));
+                context.write(new YearWritable(e), cache.get(e));
             }
         }
     }
 
-    public static class AverageTemperatureReducer extends Reducer<IntWritable, PairWritable, IntWritable, DoubleWritable> {
+    public static class AverageTemperatureReducer extends Reducer<YearWritable, PairWritable, YearWritable, DoubleWritable> {
         @Override
-        public void reduce(IntWritable key, Iterable<PairWritable> values, Context context) throws IOException, InterruptedException {
+        public void reduce(YearWritable key, Iterable<PairWritable> values, Context context) throws IOException, InterruptedException {
             double sum = 0, count = 0, avg;
             for (PairWritable val : values) {
                 sum += val.getKey();
@@ -94,6 +94,44 @@ public class AverageTemperature extends Configured implements Tool {
             }
             avg = sum / count;
             context.write(key, new DoubleWritable(avg));
+        }
+    }
+
+    public static class YearWritable implements WritableComparable {
+        private Integer year;
+
+        public YearWritable() {
+        }
+
+        public YearWritable(Integer year) {
+            this.year = year;
+        }
+
+        public Integer getYear() {
+            return year;
+        }
+
+        public void setYear(Integer year) {
+            this.year = year;
+        }
+
+        public int compareTo(Object o) {
+            return ((YearWritable) o).getYear() - this.year;
+        }
+
+        @Override
+        public String toString() {
+            return "" + year;
+        }
+
+        @Override
+        public void write(DataOutput dataOutput) throws IOException {
+            dataOutput.writeInt(year);
+        }
+
+        @Override
+        public void readFields(DataInput dataInput) throws IOException {
+            year = dataInput.readInt();
         }
     }
 
