@@ -18,6 +18,8 @@ import org.apache.hadoop.util.ToolRunner;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 public class AverageTemperature extends Configured implements Tool {
 
@@ -34,7 +36,6 @@ public class AverageTemperature extends Configured implements Tool {
         job.setJarByClass(AverageTemperature.class);
 
         job.setMapperClass(AverageTemperatureMapper.class);
-        job.setCombinerClass(AverageTemperatureCombiner.class);
         job.setReducerClass(AverageTemperatureReducer.class);
 
         job.setOutputKeyClass(IntWritable.class);
@@ -56,26 +57,30 @@ public class AverageTemperature extends Configured implements Tool {
     }
 
     public static class AverageTemperatureMapper extends Mapper<LongWritable, Text, IntWritable, PairWritable> {
+        Map<Integer, PairWritable> cache;
+
+        @Override
+        protected void setup(Context context) throws IOException, InterruptedException {
+            cache = new HashMap<Integer, PairWritable>();
+        }
+
         @Override
         public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
             Integer year = Integer.parseInt(value.toString().substring(15, 19));
             Double temperature = Double.parseDouble(value.toString().substring(87, 92)) / 10;
-            context.write(
-                    new IntWritable(year),
-                    new PairWritable(temperature, 1D)
-            );
-        }
-    }
-
-    public static class AverageTemperatureCombiner extends Reducer<IntWritable, PairWritable, IntWritable, PairWritable> {
-        @Override
-        protected void reduce(IntWritable key, Iterable<PairWritable> values, Context context) throws IOException, InterruptedException {
-            double sum = 0, count = 0;
-            for (PairWritable val : values) {
-                sum += val.getKey();
-                count += val.getValue();
+            PairWritable pair = new PairWritable(temperature, 1D);
+            if (!cache.containsKey(year))
+                cache.put(year, pair);
+            else {
+                cache.get(year).add(pair);
             }
-            context.write(key, new PairWritable(sum, count));
+        }
+
+        @Override
+        protected void cleanup(Context context) throws IOException, InterruptedException {
+            for (Integer e: cache.keySet()) {
+                context.write(new IntWritable(e), cache.get(e));
+            }
         }
     }
 
@@ -118,6 +123,11 @@ public class AverageTemperature extends Configured implements Tool {
 
         public void setValue(Double value) {
             this.value = value;
+        }
+
+        public void add(PairWritable pair) {
+            this.key += pair.getKey();
+            this.value += pair.getValue();
         }
 
         @Override
