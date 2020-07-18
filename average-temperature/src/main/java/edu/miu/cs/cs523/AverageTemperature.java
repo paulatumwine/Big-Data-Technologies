@@ -4,10 +4,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.DoubleWritable;
-import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.*;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -18,6 +15,8 @@ import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
 
 public class AverageTemperature extends Configured implements Tool {
@@ -35,10 +34,11 @@ public class AverageTemperature extends Configured implements Tool {
         job.setJarByClass(AverageTemperature.class);
 
         job.setMapperClass(AverageTemperatureMapper.class);
+        job.setCombinerClass(AverageTemperatureCombiner.class);
         job.setReducerClass(AverageTemperatureReducer.class);
 
         job.setOutputKeyClass(IntWritable.class);
-        job.setOutputValueClass(DoubleWritable.class);
+        job.setOutputValueClass(PairWritable.class);
 
         job.setInputFormatClass(TextInputFormat.class);
         job.setOutputFormatClass(TextOutputFormat.class);
@@ -55,28 +55,86 @@ public class AverageTemperature extends Configured implements Tool {
         return job.waitForCompletion(true) ? 0 : 1;
     }
 
-    public static class AverageTemperatureMapper extends Mapper<LongWritable, Text, IntWritable, DoubleWritable> {
+    public static class AverageTemperatureMapper extends Mapper<LongWritable, Text, IntWritable, PairWritable> {
         @Override
         public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
             Integer year = Integer.parseInt(value.toString().substring(15, 19));
             Double temperature = Double.parseDouble(value.toString().substring(87, 92)) / 10;
             context.write(
                     new IntWritable(year),
-                    new DoubleWritable(temperature)
+                    new PairWritable(temperature, 1D)
             );
         }
     }
 
-    public static class AverageTemperatureReducer extends Reducer<IntWritable, DoubleWritable, IntWritable, DoubleWritable> {
+    public static class AverageTemperatureCombiner extends Reducer<IntWritable, PairWritable, IntWritable, PairWritable> {
         @Override
-        public void reduce(IntWritable key, Iterable<DoubleWritable> values, Context context) throws IOException, InterruptedException {
+        protected void reduce(IntWritable key, Iterable<PairWritable> values, Context context) throws IOException, InterruptedException {
+            double sum = 0, count = 0;
+            for (PairWritable val : values) {
+                sum += val.getKey();
+                count += val.getValue();
+            }
+            context.write(key, new PairWritable(sum, count));
+        }
+    }
+
+    public static class AverageTemperatureReducer extends Reducer<IntWritable, PairWritable, IntWritable, DoubleWritable> {
+        @Override
+        public void reduce(IntWritable key, Iterable<PairWritable> values, Context context) throws IOException, InterruptedException {
             double sum = 0, count = 0, avg;
-            for (DoubleWritable val : values) {
-                sum += val.get();
-                count++;
+            for (PairWritable val : values) {
+                sum += val.getKey();
+                count += val.getValue();
             }
             avg = sum / count;
             context.write(key, new DoubleWritable(avg));
+        }
+    }
+
+    public static class PairWritable implements Writable {
+        private Double key;
+        private Double value;
+
+        public PairWritable() {
+        }
+
+        public PairWritable(Double key, Double value) {
+            this.key = key;
+            this.value = value;
+        }
+
+        public Double getKey() {
+            return key;
+        }
+
+        public void setKey(Double key) {
+            this.key = key;
+        }
+
+        public Double getValue() {
+            return value;
+        }
+
+        public void setValue(Double value) {
+            this.value = value;
+        }
+
+        @Override
+        public void write(DataOutput dataOutput) throws IOException {
+            dataOutput.writeDouble(key);
+            dataOutput.writeDouble(value);
+        }
+
+        @Override
+        public void readFields(DataInput dataInput) throws IOException {
+            key = dataInput.readDouble();
+            value = dataInput.readDouble();
+        }
+
+        @Override
+        public String toString() {
+            return "< " + key + " , " + value + " >";
         }
     }
 }
