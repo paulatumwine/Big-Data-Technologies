@@ -47,6 +47,7 @@ public class AvroGenericStationTempYear extends Configured implements Tool
 				record.put("year", utils.getYearInt());
 				
 				//populate the avroKey with record
+				avroKey.datum(record);
 				
 				context.write(avroKey, NullWritable.get());
 			}
@@ -92,7 +93,7 @@ public class AvroGenericStationTempYear extends Configured implements Tool
 		AvroJob.setMapOutputKeySchema(job, SCHEMA);
 		AvroJob.setOutputKeySchema(job, SCHEMA);
 
-		//job.setOutputFormatClass(AvroKeyOutputFormat.class);
+		job.setOutputFormatClass(AvroKeyOutputFormat.class);
 
 		return job.waitForCompletion(true) ? 0 : 1;
 	}
