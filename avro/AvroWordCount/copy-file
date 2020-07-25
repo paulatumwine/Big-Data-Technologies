@@ -1,0 +1,26 @@
+#!/bin/bash
+# docker run -it sequenceiq/hadoop-docker:latest /etc/bootstrap.sh -bash
+# sudo ./copy-file WordCount/target/WordCount-1.0-SNAPSHOT.jar WordCount/input/
+
+#CONTAINER=$(docker ps -aqf "name=flamboyant_gagarin")
+CONTAINER=$(docker ps | grep hadoop | awk '{print $1}')
+echo $CONTAINER #debug
+
+JAR_NAME=$1
+INPUT=$2
+
+if [ $# -eq 0 ]
+  then
+    INPUT=input
+    JAR_NAME=WordCountAvroOptput
+else
+	cp $JAR_NAME WordCountAvroOptput.jar
+fi
+
+docker cp WordCountAvroOptput.jar $CONTAINER:/usr/local/hadoop
+docker cp $INPUT $CONTAINER:/usr/local/hadoop
+docker cp ./hdfs-run $CONTAINER:/usr/local/hadoop
+
+#docker rm $(docker ps -a -q)
+
+

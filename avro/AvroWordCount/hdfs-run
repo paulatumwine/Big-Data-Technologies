@@ -1,0 +1,14 @@
+#!/bin/bash
+
+cd $HADOOP_PREFIX
+
+bin/hadoop fs -mkdir lordofthejars
+bin/hadoop fs -ls lordofthejars 
+
+bin/hadoop fs -put $HADOOP_PREFIX/input/WC-Input.txt lordofthejars
+bin/hadoop fs -ls lordofthejars
+
+bin/hadoop jar WordCountAvroOptput.jar edu.miu.cs.cs523.WordCountAvroOptput lordofthejars output
+bin/hadoop fs -ls output 
+
+bin/hadoop fs -cat output/part-r-00000
