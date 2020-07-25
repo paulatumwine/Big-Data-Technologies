@@ -5,6 +5,7 @@ import org.apache.avro.Schema.Type;
 import org.apache.avro.mapred.AvroKey;
 import org.apache.avro.mapred.AvroValue;
 import org.apache.avro.mapreduce.AvroJob;
+import org.apache.avro.mapreduce.AvroKeyValueOutputFormat;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -36,7 +37,7 @@ public class WordCountAvroOptput extends Configured implements Tool
 		{
 			for (String token: value.toString().split("\\s+")) {
 				word.set(token);
-				//context.write(word, one);
+				context.write(word, one);
 			}
 		}
 	}
@@ -55,6 +56,8 @@ public class WordCountAvroOptput extends Configured implements Tool
 			}
 			
 			// populate the avroKey and avroValue here
+			avroKey.datum(key);
+			avroValue.datum(sum);
 
 			context.write(avroKey, avroValue);
 		}
@@ -81,10 +84,10 @@ public class WordCountAvroOptput extends Configured implements Tool
 		job.setMapOutputKeyClass(Text.class);
 		job.setMapOutputValueClass(IntWritable.class);
 		
-		job.setInputFormatClass(TextInputFormat.class);	// This is default format; this line could've been very well omitted!
-		//job.setOutputFormatClass(AvroKeyValueOutputFormat.class);
+		//job.setInputFormatClass(TextInputFormat.class);	// This is default format; this line could've been very well omitted!
+		job.setOutputFormatClass(AvroKeyValueOutputFormat.class);
 		
-		//AvroJob.setOutputKeySchema(job, Schema.create(Type.STRING));
+		AvroJob.setOutputKeySchema(job, Schema.create(Type.STRING));
 		AvroJob.setOutputValueSchema(job, Schema.create(Type.INT));
 		
 		return job.waitForCompletion(true) ? 0 : 1;

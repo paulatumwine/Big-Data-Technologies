@@ -33,7 +33,7 @@ public class WordCountTotalAvro extends Configured implements Tool
 		public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException
 		{
 			for (String token: value.toString().split("\\s+")) {				
-				//avroKey.datum(token);
+				avroKey.datum(token);
 				context.write(avroKey, avroValue);
 			}
 		}
@@ -48,7 +48,7 @@ public class WordCountTotalAvro extends Configured implements Tool
 			int sum = 0;
 			for (AvroValue<Integer> value : values)
 			{
-				//sum += value.datum();
+				sum += value.datum();
 			}			
 			
 			avroValue.datum(sum);
@@ -78,8 +78,8 @@ public class WordCountTotalAvro extends Configured implements Tool
 		job.setOutputFormatClass(AvroKeyValueOutputFormat.class);
 		
 		// Need to set mapper output key and value schema
-		//AvroJob.setMapOutputKeySchema(job, Schema.create(Type.STRING));
-		//AvroJob.setMapOutputValueSchema(job, Schema.create(Type.INT));		
+		AvroJob.setMapOutputKeySchema(job, Schema.create(Type.STRING));
+		AvroJob.setMapOutputValueSchema(job, Schema.create(Type.INT));
 		
 		// Need to set reducer output key and value schema
 		AvroJob.setOutputKeySchema(job, Schema.create(Type.STRING));
