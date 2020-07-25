@@ -2,6 +2,7 @@ package edu.miu.cs.cs523;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.*;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
@@ -45,10 +46,10 @@ public class AvroGenericStationTempYear extends Configured implements Tool
 				record.put("stationId", utils.getStationId());
 				record.put("temperature", utils.getAirTemperature());
 				record.put("year", utils.getYearInt());
-				
+
 				//populate the avroKey with record
 				avroKey.datum(record);
-				
+
 				context.write(avroKey, NullWritable.get());
 			}
 		}
@@ -56,11 +57,39 @@ public class AvroGenericStationTempYear extends Configured implements Tool
 
 	public static class AvroReducer extends Reducer<AvroKey<GenericRecord>, NullWritable, AvroKey<GenericRecord>, NullWritable>
 	{
+		Map<Integer, AvroKey<GenericRecord>> records;
+
+		@Override
+		protected void setup(Context context) throws IOException, InterruptedException {
+			// use a LinkedHashMap to preserve desc insertion order (from avsc file)
+			records = new LinkedHashMap<Integer, AvroKey<GenericRecord>>();
+		}
+
 		@Override
 		protected void reduce(AvroKey<GenericRecord> key, Iterable<NullWritable> values,
 				Context context) throws IOException, InterruptedException
 		{
-			context.write(key, NullWritable.get());
+			GenericRecord record = new GenericData.Record(SCHEMA);
+			AvroKey<GenericRecord> avroKey = new AvroKey<GenericRecord>(record);
+			record.put("stationId", key.datum().get("stationId"));
+			record.put("temperature", key.datum().get("temperature"));
+			record.put("year", key.datum().get("year"));
+			avroKey.datum(record);
+
+			Integer year = (Integer) key.datum().get("year");
+			if (!records.containsKey(year)) records.put(year, avroKey);
+			else {
+				Float maxTemp = (Float) records.get(year).datum().get("temperature"),
+						contender = (Float) key.datum().get("temperature");
+				if (contender > maxTemp) records.put(year, avroKey);
+			}
+		}
+
+		@Override
+		protected void cleanup(Context context) throws IOException, InterruptedException {
+			for (Map.Entry<Integer, AvroKey<GenericRecord>> e: records.entrySet()) {
+				context.write(e.getValue(), NullWritable.get());
+			}
 		}
 	}
 
@@ -87,7 +116,7 @@ public class AvroGenericStationTempYear extends Configured implements Tool
 
 		job.setMapperClass(AvroMapper.class);
 		job.setReducerClass(AvroReducer.class);
-		
+
 		job.setMapOutputValueClass(NullWritable.class);
 
 		AvroJob.setMapOutputKeySchema(job, SCHEMA);
@@ -102,7 +131,7 @@ public class AvroGenericStationTempYear extends Configured implements Tool
 	{
 		Configuration conf = new Configuration();
 		FileSystem.get(conf).delete(new Path("output"), true);
-		int res = ToolRunner.run(conf, new AvroGenericStationTempYear(), args);		
+		int res = ToolRunner.run(conf, new AvroGenericStationTempYear(), args);
 		System.exit(res);
 	}
 }
