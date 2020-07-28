@@ -4,10 +4,12 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.*;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
@@ -19,8 +21,6 @@ import org.apache.hadoop.util.ToolRunner;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 public class AverageTemperature extends Configured implements Tool {
 
@@ -38,15 +38,12 @@ public class AverageTemperature extends Configured implements Tool {
 
         job.setMapperClass(AverageTemperatureMapper.class);
         job.setReducerClass(AverageTemperatureReducer.class);
-        job.setPartitionerClass(CustomPartitioner.class);
 
-        job.setOutputKeyClass(YearWritable.class);
-        job.setOutputValueClass(PairWritable.class);
+        job.setOutputKeyClass(PairWritable.class);
+        job.setOutputValueClass(IntWritable.class);
 
         job.setInputFormatClass(TextInputFormat.class);
         job.setOutputFormatClass(TextOutputFormat.class);
-
-        job.setNumReduceTasks(2);
 
         FileSystem hdfs = FileSystem.get(getConf());
 
@@ -60,141 +57,80 @@ public class AverageTemperature extends Configured implements Tool {
         return job.waitForCompletion(true) ? 0 : 1;
     }
 
-    public static class AverageTemperatureMapper extends Mapper<LongWritable, Text, YearWritable, PairWritable> {
-        Map<Integer, PairWritable> cache;
-
-        @Override
-        protected void setup(Context context) throws IOException, InterruptedException {
-            cache = new HashMap<Integer, PairWritable>();
-        }
+    public static class AverageTemperatureMapper extends Mapper<LongWritable, Text, PairWritable, IntWritable> {
 
         @Override
         public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
-            Integer year = Integer.parseInt(value.toString().substring(15, 19));
+            String station = value.toString().substring(4, 10) + "-" + value.toString().substring(10, 15);
             Double temperature = Double.parseDouble(value.toString().substring(87, 92)) / 10;
-            PairWritable pair = new PairWritable(temperature, 1D);
-            if (!cache.containsKey(year))
-                cache.put(year, pair);
-            else {
-                cache.get(year).add(pair);
+            PairWritable pair = new PairWritable(station, temperature);
+
+            Integer year = Integer.parseInt(value.toString().substring(15, 19));
+
+            context.write(pair, new IntWritable(year));
+        }
+    }
+
+    public static class AverageTemperatureReducer extends Reducer<PairWritable, IntWritable, PairWritable, IntWritable> {
+
+        @Override
+        public void reduce(PairWritable key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
+            for (IntWritable val : values) {
+                context.write(key, val);
             }
         }
-
-        @Override
-        protected void cleanup(Context context) throws IOException, InterruptedException {
-            for (Integer e: cache.keySet()) {
-                context.write(new YearWritable(e), cache.get(e));
-            }
-        }
     }
 
-    public static class CustomPartitioner<K, V> extends Partitioner<K, V> {
-        @Override
-        public int getPartition(K k, V v, int i) {
-            YearWritable yw = (YearWritable) k;
-            return yw.getYear() < 1930 ? 0 : 1;
-        }
-    }
-
-    public static class AverageTemperatureReducer extends Reducer<YearWritable, PairWritable, YearWritable, DoubleWritable> {
-        @Override
-        public void reduce(YearWritable key, Iterable<PairWritable> values, Context context) throws IOException, InterruptedException {
-            double sum = 0, count = 0, avg;
-            for (PairWritable val : values) {
-                sum += val.getKey();
-                count += val.getValue();
-            }
-            avg = sum / count;
-            context.write(key, new DoubleWritable(avg));
-        }
-    }
-
-    public static class YearWritable implements WritableComparable {
-        private Integer year;
-
-        public YearWritable() {
-        }
-
-        public YearWritable(Integer year) {
-            this.year = year;
-        }
-
-        public Integer getYear() {
-            return year;
-        }
-
-        public void setYear(Integer year) {
-            this.year = year;
-        }
-
-        public int compareTo(Object o) {
-            return ((YearWritable) o).getYear() - this.year;
-        }
-
-        @Override
-        public String toString() {
-            return "" + year;
-        }
-
-        @Override
-        public void write(DataOutput dataOutput) throws IOException {
-            dataOutput.writeInt(year);
-        }
-
-        @Override
-        public void readFields(DataInput dataInput) throws IOException {
-            year = dataInput.readInt();
-        }
-    }
-
-    public static class PairWritable implements Writable {
-        private Double key;
-        private Double value;
+    public static class PairWritable implements WritableComparable {
+        private String station;
+        private Double temp;
 
         public PairWritable() {
         }
 
-        public PairWritable(Double key, Double value) {
-            this.key = key;
-            this.value = value;
+        public PairWritable(String station, Double temp) {
+            this.station = station;
+            this.temp = temp;
         }
 
-        public Double getKey() {
-            return key;
+        public String getStation() {
+            return station;
         }
 
-        public void setKey(Double key) {
-            this.key = key;
+        public void setStation(String station) {
+            this.station = station;
         }
 
-        public Double getValue() {
-            return value;
+        public Double getTemp() {
+            return temp;
         }
 
-        public void setValue(Double value) {
-            this.value = value;
+        public void setTemp(Double temp) {
+            this.temp = temp;
         }
 
-        public void add(PairWritable pair) {
-            this.key += pair.getKey();
-            this.value += pair.getValue();
+        @Override
+        public int compareTo(Object o) {
+            int result = ((PairWritable) o).getStation().compareTo(this.getStation());
+            if (result != 0) return -1 * result; // reverse sort
+            else return ((PairWritable) o).getTemp().compareTo(this.getTemp());
         }
 
         @Override
         public void write(DataOutput dataOutput) throws IOException {
-            dataOutput.writeDouble(key);
-            dataOutput.writeDouble(value);
+            dataOutput.writeUTF(this.station);
+            dataOutput.writeDouble(this.temp);
         }
 
         @Override
         public void readFields(DataInput dataInput) throws IOException {
-            key = dataInput.readDouble();
-            value = dataInput.readDouble();
+            this.station = dataInput.readUTF();
+            this.temp = dataInput.readDouble();
         }
 
         @Override
         public String toString() {
-            return "< " + key + " , " + value + " >";
+            return this.station + "    " + this.temp;
         }
     }
 }
